@@ -1,70 +1,65 @@
 # LLM Backends
 
-This module manages connections to various large language models (LLMs) supported in the RAG assistant.  
-Each file here wraps a specific backend (Ollama, OpenAI, Hugging Face, etc.) so the rest of the app can call `get_llm()` without knowing the underlying engine.
+This module manages all supported large language model (LLM) integrations for the RAG assistant.  
+It is designed to support multiple **backends** (Ollama, OpenAI, Hugging Face, etc.) and multiple **models** within each backend (e.g. LLaMA 2, Mistral, GPT-4, Gemma).
 
 ---
 
 ## Purpose
 
-This folder isolates all LLM logic from the rest of the backend.  
-You can easily swap or add new models without touching the core RAG pipeline or UI code.
+This folder wraps each LLM provider behind a consistent interface.  
+It allows the rest of the app to dynamically choose:
+- Which backend to use (e.g., Ollama or OpenAI)
+- Which model to load (e.g., llama2 or mistral)
 
 ---
 
 ## Structure
 
-| File               | Role |
-|--------------------|------|
-| `ollama_llm.py`     | Uses `Ollama(model="llama2")` via LangChain to run local models |
-| `openai_llm.py`     | Connects to OpenAI’s cloud API (e.g. GPT-3.5, GPT-4) |
-| `huggingface_llm.py` | Runs Hugging Face Transformers locally using `AutoModel` and `AutoTokenizer` |
-| `llm_factory.py`    | Chooses which backend to use dynamically at runtime |
-| `__init__.py`       | Makes this folder importable and optionally exposes a public API like `get_llm()` |
+| File               | Purpose |
+|--------------------|---------|
+| `ollama_llm.py`     | Loads local models via Ollama (e.g., LLaMA 2, Mistral, Gemma) |
+| `openai_llm.py`     | Uses OpenAI API (e.g., GPT-3.5, GPT-4) |
+| `huggingface_llm.py`| Loads local models via Transformers (e.g., Gemma, Phi-2) |
+| `gpt4all_llm.py`    | (Optional) Integration with GPT4All local desktop engine |
+| `command_r_llm.py`  | (Optional) For future integration with RAG-tuned models like Command-R |
+| `lmstudio_llm.py`   | (Optional) For local models loaded via LM Studio |
+| `llm_factory.py`    | Central dispatch to load the correct backend + model |
+| `__init__.py`       | Makes this a Python module and optionally exposes `get_llm()` |
+| `README.md`         | This file — documents LLM backend structure and usage |
 
 ---
 
-## Example Use
+## Usage
 
-In the pipeline:
+Use the factory in your pipeline:
 python
 from backend.llm.llm_factory import get_llm
 
-llm = get_llm("ollama")  # or "openai", "huggingface"
-Each backend returns a LangChain-compatible LLM object with .invoke() support.
+llm = get_llm(backend="ollama", model_name="mistral")
 
-# Adding New Backends
+All LLM loaders return a LangChain-compatible object with .invoke() support.
 
-To support another engine (e.g. GPT4All, LM Studio, Claude):
+Adding a New Backend or Model
 
-    Create gpt4all_llm.py or claude_llm.py
+    Create a new file: e.g., claude_llm.py
 
-    Write a load_model() function that returns a compatible object
+    Add a load_model(model_name: str) function
 
-    Add a conditional to llm_factory.py
+    Update llm_factory.py to route it
 
-# Testing
+## Testing
 
-Unit tests should:
+    Each backend file should include a basic .invoke("test prompt") example
 
-    Mock each model’s invoke() method
+    Validate that all supported model names are mapped correctly
 
-    Ensure llm_factory.get_llm("backend") returns expected type
+    Confirm that LangChain wrappers are returned from each loader
 
-    Verify model configuration options (model name, temperature, etc.)
+## Related Modules
 
-# Design Philosophy
+    retriever/: loads and chunks documents
 
-    This folder hides LLM implementation details behind a consistent interface
+    vector_store/: handles embedding + search
 
-    You can change LLMs without changing pipeline or UI logic
-
-    Each file handles exactly one integration to simplify testing and debugging
-
-# Related Modules
-
-    retriever/: loads and splits documents
-
-    vector_store/: embeds and stores text
-
-    pipeline/: connects LLM and retriever to form a RAG system
+    pipeline/: connects retriever + LLM into RAG
