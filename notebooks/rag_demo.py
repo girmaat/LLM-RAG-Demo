@@ -7,8 +7,8 @@ from langchain.prompts import PromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.llms import Ollama
-
+from langchain_ollama import OllamaLLM
+from langchain.chains import RetrievalQA
 
 # Set page configuration
 st.set_page_config(page_title="Chat with your Documents", layout="wide")
@@ -87,7 +87,7 @@ docs = retriever.get_relevant_documents(query)
 
 # LLM Setup - using Ollama
 # Set up the LLM interface using Ollama
-llm = Ollama(model="llama2")  # or "mistral", "phi", etc., if you've pulled them
+llm = OllamaLLM(model="llama2")  
 
 prompt_template = """
 You are a helpful assistant that answers questions based on the provided context.
@@ -108,4 +108,30 @@ prompt = PromptTemplate(
     template=prompt_template,
     input_variables=["context", "question"]
 )
+
+# RAG Chain Execution. This connects the following components from the above steps: retriever, llm, prompt
+from langchain.chains import RetrievalQA
+
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    chain_type="stuff",
+    retriever=retriever,
+    return_source_documents=True,
+    chain_type_kwargs={"prompt": prompt}
+)
+
+
+# Sample user query
+query = "What is the telework policy?"
+
+# Run the full chain
+response = qa_chain.invoke(query)
+# Display
+st.write("### ✅ Answer:")
+st.write(response["result"])
+
+# Optional: Show sources
+for i, doc in enumerate(response["source_documents"]):
+    st.write(f"**Source {i+1}:**")
+    st.write(doc.page_content[:300])  # show first 300 chars
 
