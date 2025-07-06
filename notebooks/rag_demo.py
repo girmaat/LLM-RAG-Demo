@@ -1,4 +1,8 @@
 import streamlit as st
+import tempfile
+import os
+
+from langchain_community.document_loaders import PyPDFLoader
 
 # Set page configuration
 st.set_page_config(page_title="Chat with your Documents", layout="wide")
@@ -16,3 +20,30 @@ user_input = st.text_input("Ask a question:")
 # Display input just for testing (temporary)
 if user_input:
     st.write("You asked:", user_input)
+
+
+# File uploader in the sidebar
+uploads = st.sidebar.file_uploader(
+    label="Upload documents (PDF, DOCX, TXT)",
+    type=["pdf", "docx", "txt"],
+    accept_multiple_files=True
+)
+
+# Stop execution until files are uploaded
+if not uploads:
+    st.sidebar.info("⬆️ Please upload one or more supported documents to continue.")
+    st.stop()
+
+# Temporary directory to store uploaded files
+temp_dir = tempfile.TemporaryDirectory()
+docs = []
+
+# Loop through each uploaded file
+for file in uploads:
+    temp_path = os.path.join(temp_dir.name, file.name)
+    with open(temp_path, "wb") as f:
+        f.write(file.getvalue())
+
+    # Load and extract documents using PyPDFLoader
+    loader = PyPDFLoader(temp_path)
+    docs.extend(loader.load())
