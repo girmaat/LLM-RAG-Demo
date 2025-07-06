@@ -121,17 +121,22 @@ qa_chain = RetrievalQA.from_chain_type(
 )
 
 
-# Sample user query
-query = "What is the telework policy?"
+# Streamlit UI - Ask Questions
+st.header("📘 Ask a Question About Your Document")
 
-# Run the full chain
-response = qa_chain.invoke(query)
-# Display
-st.write("### ✅ Answer:")
-st.write(response["result"])
+query = st.text_input("Ask a question:", placeholder="e.g. What is the company travel policy?")
 
-# Optional: Show sources
-for i, doc in enumerate(response["source_documents"]):
-    st.write(f"**Source {i+1}:**")
-    st.write(doc.page_content[:300])  # show first 300 chars
+if query:
+    with st.spinner("Thinking..."):
+        response = qa_chain.invoke(query)
+
+        st.success("Answer:")
+        st.write(response["result"])
+
+        # Optional: Show sources
+        with st.expander("📄 Sources used"):
+            for i, doc in enumerate(response["source_documents"]):
+                st.markdown(f"**Source {i+1}**")
+                st.write(doc.page_content[:500])  # limit output
+
 
