@@ -3,6 +3,7 @@ import tempfile
 import os
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
@@ -66,3 +67,12 @@ embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-Mi
 st.write("🔄 Generating embeddings...")
 embeddings = embedding_model.embed_documents([chunk.page_content for chunk in chunks])
 st.write(f"✅ Generated {len(embeddings)} vector embeddings.")
+
+# Step 3.6: Vector Store Setup
+from langchain.vectorstores import FAISS
+
+# Store the embedded documents in FAISS index
+vectorstore = FAISS.from_documents(docs, embeddings)
+
+# Optional: Save to disk for reuse (you can skip this during prototyping)
+# vectorstore.save_local("faiss_index")
