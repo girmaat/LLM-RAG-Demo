@@ -47,3 +47,16 @@ for file in uploads:
     # Load and extract documents using PyPDFLoader
     loader = PyPDFLoader(temp_path)
     docs.extend(loader.load())
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+# Split text into chunks with overlap
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+    separators=["\n\n", "\n", ".", " ", ""]
+)
+
+chunks = splitter.split_documents(docs)
+
+st.write(f"✅ Split into {len(chunks)} chunks.")
