@@ -65,14 +65,23 @@ embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-Mi
 
 # Embed the chunks
 st.write("🔄 Generating embeddings...")
-embeddings = embedding_model.embed_documents([chunk.page_content for chunk in chunks])
-st.write(f"✅ Generated {len(embeddings)} vector embeddings.")
 
-# Step 3.6: Vector Store Setup
+# Vector Store Setup
 from langchain.vectorstores import FAISS
 
 # Store the embedded documents in FAISS index
-vectorstore = FAISS.from_documents(docs, embeddings)
+vectorstore = FAISS.from_documents(chunks, embedding_model)
 
 # Optional: Save to disk for reuse (you can skip this during prototyping)
 # vectorstore.save_local("faiss_index")
+st.write(f"✅ FAISS vector store created with {vectorstore.index.ntotal} documents.")
+print("Chunks in index:", vectorstore.index.ntotal)
+# Retriever Setup
+retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4})
+
+query = "What topics are discussed in the document?"
+docs = retriever.get_relevant_documents(query)
+
+for i, doc in enumerate(docs):
+    print(f"\n--- Document {i+1} ---")
+    print(doc.page_content[:300])  # print preview of each result
