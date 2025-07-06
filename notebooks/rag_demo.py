@@ -6,6 +6,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.llms import Ollama
+
 
 # Set page configuration
 st.set_page_config(page_title="Chat with your Documents", layout="wide")
@@ -82,6 +84,11 @@ retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k
 query = "What topics are discussed in the document?"
 docs = retriever.get_relevant_documents(query)
 
-for i, doc in enumerate(docs):
-    print(f"\n--- Document {i+1} ---")
-    print(doc.page_content[:300])  # print preview of each result
+# LLM Setup - using Ollama
+# Set up the LLM interface using Ollama
+llm = Ollama(model="llama2")  # or "mistral", "phi", etc., if you've pulled them
+
+# Optional: Test the LLM with a simple prompt
+response = llm.invoke("What is the capital of France?")
+st.write("LLM Test Response:", response)
+
