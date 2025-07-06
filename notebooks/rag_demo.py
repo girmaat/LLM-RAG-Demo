@@ -3,6 +3,7 @@ import tempfile
 import os
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.prompts import PromptTemplate
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -88,7 +89,23 @@ docs = retriever.get_relevant_documents(query)
 # Set up the LLM interface using Ollama
 llm = Ollama(model="llama2")  # or "mistral", "phi", etc., if you've pulled them
 
-# Optional: Test the LLM with a simple prompt
-response = llm.invoke("What is the capital of France?")
-st.write("LLM Test Response:", response)
+prompt_template = """
+You are a helpful assistant that answers questions based on the provided context.
+
+Use ONLY the information from the context to answer. 
+If you are unsure, say "I don't know" — do not make up an answer.
+
+Context:
+{context}
+
+Question:
+{question}
+
+Helpful Answer:
+"""
+
+prompt = PromptTemplate(
+    template=prompt_template,
+    input_variables=["context", "question"]
+)
 
