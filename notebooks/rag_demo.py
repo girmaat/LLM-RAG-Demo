@@ -2,7 +2,9 @@ import streamlit as st
 import tempfile
 import os
 
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # Set page configuration
 st.set_page_config(page_title="Chat with your Documents", layout="wide")
@@ -48,8 +50,6 @@ for file in uploads:
     loader = PyPDFLoader(temp_path)
     docs.extend(loader.load())
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 # Split text into chunks with overlap
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=1000,
@@ -59,4 +59,10 @@ splitter = RecursiveCharacterTextSplitter(
 
 chunks = splitter.split_documents(docs)
 
-st.write(f"✅ Split into {len(chunks)} chunks.")
+# Initialize the embedding model
+embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+# Embed the chunks
+st.write("🔄 Generating embeddings...")
+embeddings = embedding_model.embed_documents([chunk.page_content for chunk in chunks])
+st.write(f"✅ Generated {len(embeddings)} vector embeddings.")
