@@ -13,20 +13,9 @@ from langchain.chains import RetrievalQA
 # Set page configuration
 st.set_page_config(page_title="Chat with your Documents", layout="wide")
 
-# Sidebar for navigation or future use (file upload will go here later)
+# Sidebar
 st.sidebar.title("📂 Document Chat Assistant")
-st.sidebar.markdown("Upload your PDF files here (coming soon).")
-
-# App title
-st.title("💬 Ask Questions About Your Documents")
-
-# Text input box for user query
-user_input = st.text_input("Ask a question:")
-
-# Display input just for testing (temporary)
-if user_input:
-    st.write("You asked:", user_input)
-
+st.sidebar.markdown("Upload your PDF files here.")
 
 # File uploader in the sidebar
 uploads = st.sidebar.file_uploader(
@@ -44,51 +33,35 @@ if not uploads:
 temp_dir = tempfile.TemporaryDirectory()
 docs = []
 
-# Loop through each uploaded file
+# Load files
 for file in uploads:
     temp_path = os.path.join(temp_dir.name, file.name)
     with open(temp_path, "wb") as f:
         f.write(file.getvalue())
 
-    # Load and extract documents using PyPDFLoader
     loader = PyPDFLoader(temp_path)
     docs.extend(loader.load())
 
-# Split text into chunks with overlap
+# Split text into chunks
 splitter = RecursiveCharacterTextSplitter(
     chunk_size=1000,
     chunk_overlap=200,
     separators=["\n\n", "\n", ".", " ", ""]
 )
-
 chunks = splitter.split_documents(docs)
 
-# Initialize the embedding model
+# Embeddings
 embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-# Embed the chunks
 st.write("🔄 Generating embeddings...")
-
-# Vector Store Setup
-from langchain.vectorstores import FAISS
-
-# Store the embedded documents in FAISS index
 vectorstore = FAISS.from_documents(chunks, embedding_model)
 
-# Optional: Save to disk for reuse (you can skip this during prototyping)
-# vectorstore.save_local("faiss_index")
-st.write(f"✅ FAISS vector store created with {vectorstore.index.ntotal} documents.")
-print("Chunks in index:", vectorstore.index.ntotal)
-# Retriever Setup
+# Retriever
 retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4})
 
-query = "What topics are discussed in the document?"
-docs = retriever.get_relevant_documents(query)
+# LLM via Ollama
+llm = OllamaLLM(model="llama2")
 
-# LLM Setup - using Ollama
-# Set up the LLM interface using Ollama
-llm = OllamaLLM(model="llama2")  
-
+# Prompt
 prompt_template = """
 You are a helpful assistant that answers questions based on the provided context.
 
@@ -103,15 +76,9 @@ Question:
 
 Helpful Answer:
 """
+prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
 
-prompt = PromptTemplate(
-    template=prompt_template,
-    input_variables=["context", "question"]
-)
-
-# RAG Chain Execution. This connects the following components from the above steps: retriever, llm, prompt
-from langchain.chains import RetrievalQA
-
+# QA Chain
 qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type="stuff",
@@ -120,23 +87,35 @@ qa_chain = RetrievalQA.from_chain_type(
     chain_type_kwargs={"prompt": prompt}
 )
 
+# ✅ Initialize chat memory
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# Streamlit UI - Ask Questions
+# 💬 UI: Question Input
 st.header("📘 Ask a Question About Your Document")
 
-query = st.text_input("Ask a question:", placeholder="e.g. What is the company travel policy?")
+query = st.text_input("Ask a question:", key="user_input", placeholder="e.g. What is the company travel policy?")
 
+# 🧼 Optional: Clear chat button
+if st.button("🗑️ Clear Chat"):
+    st.session_state.chat_history = []
+
+# 🧠 Handle new question
 if query:
     with st.spinner("Thinking..."):
         response = qa_chain.invoke(query)
+        answer = response["result"]
 
-        st.success("Answer:")
-        st.write(response["result"])
+        # Save to session history
+        st.session_state.chat_history.append({"user": query, "bot": answer, "sources": response["source_documents"]})
 
-        # Optional: Show sources
-        with st.expander("📄 Sources used"):
-            for i, doc in enumerate(response["source_documents"]):
-                st.markdown(f"**Source {i+1}**")
-                st.write(doc.page_content[:500])  # limit output
+# 💬 Display full conversation
+for i, turn in enumerate(st.session_state.chat_history):
+    st.markdown(f"**🧑 You:** {turn['user']}")
+    st.markdown(f"**🤖 Assistant:** {turn['bot']}")
 
-
+    # Expandable source for each answer
+    with st.expander(f"📄 Sources used for Question {i+1}"):
+        for j, doc in enumerate(turn["sources"]):
+            st.markdown(f"**Source {j+1}**")
+            st.write(doc.page_content[:500])
