@@ -1,14 +1,17 @@
 import streamlit as st
 import tempfile
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
-from langchain_community.vectorstores import FAISS
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_ollama import OllamaLLM
 from langchain.chains import RetrievalQA
+
+from backend.llm.ollama_llm import get_ollama_llm
+from backend.vector_store.faiss_store import build_faiss_index, load_faiss_index
+from backend.retriever.pdf.loader import load_pdf
+from backend.retriever.pdf.splitter import split_into_chunks, get_embedder
+
 
 # Set page configuration
 st.set_page_config(page_title="Chat with your Documents", layout="wide")
@@ -39,27 +42,30 @@ for file in uploads:
     with open(temp_path, "wb") as f:
         f.write(file.getvalue())
 
-    loader = PyPDFLoader(temp_path)
-    docs.extend(loader.load())
+    loader = load_pdf(temp_path)
+    docs.extend(loader)
 
 # Split text into chunks
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=200,
-    separators=["\n\n", "\n", ".", " ", ""]
-)
-chunks = splitter.split_documents(docs)
+chunks = split_into_chunks(docs)
 
 # Embeddings
-embedding_model = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+embedding_model = get_embedder()
 st.write("🔄 Generating embeddings...")
-vectorstore = FAISS.from_documents(chunks, embedding_model)
+index_path = "faiss_index"
+
+try:
+    vectorstore = load_faiss_index(index_path, embedding_model)
+    st.write("Loaded FAISS index from disk")
+except FileNotFoundError:
+    st.write("Building new FAISS index...")
+    vectorstore = build_faiss_index(chunks, embedding_model, persist_path=index_path)
 
 # Retriever
 retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 4})
 
 # LLM via Ollama
-llm = OllamaLLM(model="llama2")
+llm = get_ollama_llm("llama2")
+
 
 # Prompt
 prompt_template = """
