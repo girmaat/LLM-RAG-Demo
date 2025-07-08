@@ -68,18 +68,25 @@ llm = get_ollama_llm("llama2")
 # Prompt and QA Chain
 qa_chain = build_qa_chain(llm, retriever)
 
-# ✅ Initialize chat memory
+# ✅ Initialize session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "query_input" not in st.session_state:
+    st.session_state.query_input = ""
 
 # 💬 UI: Question Input
 st.header("📘 Ask a Question About Your Document")
 
-query = st.text_input("Ask a question:", key="user_input", placeholder="e.g. What is the company travel policy?")
+query = st.text_input(
+    "Ask a question:",
+    key="query_input",
+    placeholder="e.g. What is the company travel policy?"
+)
 
-# 🧼 Optional: Clear chat button
+# 🧼 Clear Chat button
 if st.button("🗑️ Clear Chat"):
     st.session_state.chat_history = []
+    st.session_state.query_input = ""  # also reset the input field
 
 # 🧠 Handle new question
 if query:
@@ -88,15 +95,22 @@ if query:
         answer = response["result"]
 
         # Save to session history
-        st.session_state.chat_history.append({"user": query, "bot": answer, "sources": response["source_documents"]})
+        st.session_state.chat_history.append({
+            "user": query,
+            "bot": answer,
+            "sources": response["source_documents"]
+        })
 
-# Display full conversation
+        # ✅ Clear the input field after processing
+        st.session_state.query_input = ""
+
+# 💬 Display full conversation
 for i, turn in enumerate(st.session_state.chat_history):
     st.markdown(f"**🧑 You:** {turn['user']}")
     st.markdown(f"**🤖 Assistant:** {turn['bot']}")
 
-    # Expandable source for each answer
     with st.expander(f"📄 Sources used for Question {i+1}"):
         for j, doc in enumerate(turn["sources"]):
             st.markdown(f"**Source {j+1}**")
             st.write(doc.page_content[:500])
+
