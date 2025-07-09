@@ -3,8 +3,9 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda, RunnableMap
 
 def build_lcel_chain(llm, retriever):
+    # Prompt uses "query" instead of "question"
     prompt_template = """
-    You are a helpful assistant that answers questions based on the provided context.
+    You are a helpful assistant that answers user input based on the provided context.
 
     Use ONLY the information from the context to answer. 
     If you are unsure, say "I don't know".
@@ -12,51 +13,47 @@ def build_lcel_chain(llm, retriever):
     Context:
     {context}
 
-    Question:
-    {question}
+    Query:
+    {query}
 
     Helpful Answer:
     """
+    prompt = PromptTemplate.from_template(prompt_template)
 
-    prompt = PromptTemplate(
-        template=prompt_template,
-        input_variables=["context", "question"]
-    )
+    # Extract query from input
+    get_query = lambda x: x["query"]
+    retriever_step = RunnableLambda(get_query) | retriever
 
-    parser = StrOutputParser()
+    # Prepare inputs for prompt
+    format_input = RunnableMap({
+        "context": retriever_step,
+        "query": get_query
+    })
 
-    # Step 1: Extract question from input dict
-    def get_question(x):
-        return x["question"]
-
-    # Step 2: Pass the question string to retriever
-    retriever_step = RunnableLambda(get_question) | retriever
-
-    # Step 3: Combine retriever and question, and build prompt
-    def build_output(inputs):
-        # 🧪 Debug prints to confirm runtime data types
-        print("🧪 QUERY TYPE:", type(inputs["question"]))         # should be str
-        print("🧪 CONTEXT TYPE:", type(inputs["context"]))       # should be list
-        if inputs["context"]:
-            print("🧪 FIRST DOC TYPE:", type(inputs["context"][0]))  # should be Document
-
-        context_str = "\n\n".join([doc.page_content for doc in inputs["context"]])
-        formatted_prompt = prompt.format(
-            context=context_str,
-            question=inputs["question"]
-        )
-
-        raw_response = llm.invoke(formatted_prompt)
+    # Format into flat string for prompt
+    def merge_docs(inputs):
         return {
-            "result": parser.invoke(raw_response),
-            "source_documents": inputs["context"]
+            "context": "\n\n".join(doc.page_content for doc in inputs["context"]),
+            "query": inputs["query"],
+            "documents": inputs["context"]  # keep raw docs for source return
         }
 
+    # Wrap parsed result + sources
+    def wrap_output(inputs):
+        return {
+            "result": inputs["answer"],
+            "source_documents": inputs["documents"]
+        }
+
+    # Final LCEL RAG Chain
     rag_chain = (
-        RunnableMap({
-            "context": retriever_step,
-            "question": get_question
-        }) | RunnableLambda(build_output)
+        format_input
+        | RunnableLambda(merge_docs)
+        | RunnableMap({
+            "answer": prompt | llm | StrOutputParser(),
+            "documents": lambda x: x["documents"]
+        })
+        | RunnableLambda(wrap_output)
     )
 
     return rag_chain
