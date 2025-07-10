@@ -5,7 +5,7 @@ import shutil
 import sys
 from datetime import datetime
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
 
 # Set this flag to switch between chains
 MODE = "lcel"  # switch between "lcel" and "retrievalqa" if needed
@@ -23,7 +23,7 @@ st.sidebar.markdown(f"**Current pipeline:** `{MODE.upper()}`")
 
 index_path = "faiss_index"
 
-# Sidebar upload
+# Sidebar upload streamlit
 st.sidebar.title("📂 Document Chat Assistant")
 st.sidebar.markdown("Upload your PDF files here.")
 
