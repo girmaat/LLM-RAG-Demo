@@ -15,6 +15,8 @@ from backend.llm.ollama_llm import get_ollama_llm
 from backend.vector_store.faiss_store import build_faiss_index, load_faiss_index
 from backend.retriever.pdf.loader import load_pdf
 from backend.retriever.pdf.splitter import split_into_chunks, get_embedder
+from backend.agents.wikipedia_agent import query_wikipedia_agent
+
 
 # Import the right chain builder
 if MODE == "retrievalqa":
@@ -31,6 +33,13 @@ index_path = "faiss_index"
 # Sidebar upload
 st.sidebar.title("📂 Document Chat Assistant")
 st.sidebar.markdown("Upload your PDF files here.")
+
+# Source selector (PDF or Wikipedia)
+source_option = st.sidebar.selectbox(
+    label="Data Source",
+    options=["PDF", "Wikipedia"],
+    index=0
+)
 
 uploads = st.sidebar.file_uploader(
     label="Upload documents (PDF, DOCX, TXT)",
@@ -98,17 +107,28 @@ if st.button("Clear Chat"):
 # Format input correctly based on chain type
 if query:
     with st.spinner("Thinking..."):
-        if MODE == "retrievalqa":
-            response = qa_chain.invoke(query)
+        if source_option == "PDF":
+            if MODE == "retrievalqa":
+                response = qa_chain.invoke(query)
+            else:
+                response = qa_chain.invoke({"query": query})
+
+            answer = response["result"]
+            sources = response["source_documents"]
+            source_type = "pdf"
         else:
-            response = qa_chain.invoke({"query": query})
+            answer = query_wikipedia_agent(query)
+            sources = []
+            source_type = "wikipedia"
 
         st.session_state.chat_history.append({
             "user": query,
-            "bot": response["result"],
-            "sources": response["source_documents"],
+            "bot": answer,
+            "sources": sources,
+            "source_type": source_type,
             "timestamp": datetime.now().strftime("%m/%d/%Y %I:%M %p")
         })
+
 
 # Show chat history
 for i, turn in enumerate(st.session_state.chat_history):
