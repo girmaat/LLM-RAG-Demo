@@ -30,3 +30,14 @@ def get_wikipedia_agent():
     )
 
     return agent_executor
+
+
+def query_wikipedia_agent(user_query: str) -> str:
+    """
+    Takes a user question as input and returns an answer using the Wikipedia agent.
+    Example:
+        query_wikipedia_agent("What is Zero Trust?")
+    """
+    agent = get_wikipedia_agent()
+    response = agent.run(user_query)
+    return response
